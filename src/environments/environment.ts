@@ -2,7 +2,7 @@
 export const environment = {
   production: true,
   appName: 'ENI Mail',
-  apiUrl: '/api',
+  apiUrl: 'https://api-eni-mailing.onrender.com',
   mailDomain: 'eni.mg',
   /** true = backend simulé dans le navigateur (src/app/core/mock) */
   useMockApi: false,
