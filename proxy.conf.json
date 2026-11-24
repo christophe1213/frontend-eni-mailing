@@ -1,6 +1,6 @@
 {
   "/api": {
-    "target": "https://api-eni-mailing.onrender.com/",
+    "target": "https://api-eni-mailing.onrender.com",
     "secure": false,
     "changeOrigin": true,
     "ws": true
