@@ -1,0 +1,152 @@
+<div class="page">
+  <div class="page-header">
+    <div><h1>Utilisateurs</h1><p>Créez, modifiez et désactivez les comptes de la plateforme.</p></div>
+    <button class="btn primary" (click)="open(null)"><app-icon name="plus" [size]="16" /> Nouvel utilisateur</button>
+  </div>
+
+  <div class="toolbar">
+    <input class="input grow" type="search" placeholder="Nom, e-mail, matricule…" [(ngModel)]="q" (ngModelChange)="search()" />
+    <select class="input" [(ngModel)]="role" (ngModelChange)="search()" aria-label="Rôle">
+      <option value="">Tous les rôles</option>
+      @for (r of roles; track r) { <option [value]="r">{{ roleLabels[r] }}</option> }
+    </select>
+    <select class="input" [(ngModel)]="active" (ngModelChange)="search()" aria-label="Statut">
+      <option value="">Tous les statuts</option>
+      <option value="true">Actifs</option>
+      <option value="false">Désactivés</option>
+      <option value="pending">En attente de validation</option>
+    </select>
+  </div>
+
+  <div class="card">
+    @if (data(); as d) {
+      <div class="table-wrap">
+        <table class="table">
+          <thead>
+            <tr><th>Utilisateur</th><th>Matricule</th><th>Rôle</th><th>Niveau / fonction</th><th>Dernière connexion</th><th>Statut</th><th></th></tr>
+          </thead>
+          <tbody>
+            @for (u of d.items; track u.id) {
+              <tr [class.off]="!u.active && !u.pending" [class.validated]="flash() === u.id">
+                <td><div class="who"><app-avatar [user]="u" [size]="32" /><div><strong>{{ u | fullName }}</strong><span class="muted">{{ u.email }}</span></div></div></td>
+                <td>{{ u.matricule }}</td>
+                <td><span class="badge" [class.primary]="u.role === 'ADMIN'">{{ u.role | roleLabel }}</span></td>
+                <td>{{ u.level ? u.level + ' · ' + u.track : (u.position || '—') }}</td>
+                <td>{{ u.lastLoginAt ? (u.lastLoginAt | mailDate) : 'Jamais' }}</td>
+                <td>
+                  @if (u.pending) { <span class="badge amber">En attente</span> } @else if (u.active) { <span class="badge green" [class.pop]="flash() === u.id">@if (flash() === u.id) { <app-icon name="check" [size]="12" /> }Actif</span> } @else { <span class="badge red">Désactivé</span> }
+                </td>
+                <td class="right">
+                  @if (u.id !== auth.user()?.id) {
+                    @if (u.pending) {
+                      <span class="pending-actions" role="group" [attr.aria-label]="'Inscription de ' + u.firstName + ' ' + u.lastName">
+                        <button type="button" class="btn sm success" [class.loading]="busy()[u.id] === 'validate'" [disabled]="!!busy()[u.id]"
+                                [attr.aria-busy]="busy()[u.id] === 'validate'" (click)="ask(u, 'validate')"
+                                title="Valider l’inscription" [attr.aria-label]="'Valider l’inscription de ' + u.firstName + ' ' + u.lastName">
+                          @if (busy()[u.id] === 'validate') { <span class="btn-spinner" aria-hidden="true"></span> } @else { <app-icon name="check" [size]="16" /> }
+                          {{ busy()[u.id] === 'validate' ? 'Validation…' : 'Valider' }}
+                        </button>
+                        <button type="button" class="btn sm danger" [class.loading]="busy()[u.id] === 'reject'" [disabled]="!!busy()[u.id]"
+                                [attr.aria-busy]="busy()[u.id] === 'reject'" (click)="ask(u, 'reject')"
+                                title="Refuser l’inscription" [attr.aria-label]="'Refuser l’inscription de ' + u.firstName + ' ' + u.lastName">
+                          @if (busy()[u.id] === 'reject') { <span class="btn-spinner" aria-hidden="true"></span> } @else { <app-icon name="x" [size]="16" /> }
+                          {{ busy()[u.id] === 'reject' ? 'Refus…' : 'Refuser' }}
+                        </button>
+                      </span>
+                    } @else {
+                      <button class="btn sm ghost" (click)="toggleActive(u)" [title]="u.active ? 'Désactiver' : 'Réactiver'" [attr.aria-label]="u.active ? 'Désactiver' : 'Réactiver'">@if (u.active) { <app-icon name="ban" [size]="16" /> } @else { <app-icon name="circle-check" [size]="16" /> }</button>
+                    }
+                  }
+                </td>
+              </tr>
+            } @empty {
+              <tr><td colspan="7" class="muted">Aucun utilisateur trouvé.</td></tr>
+            }
+          </tbody>
+        </table>
+      </div>
+      <div class="pager">
+        <span class="muted">{{ d.total }} utilisateur(s) · page {{ d.page }} / {{ pages(d) }}</span>
+        <button class="btn sm" [disabled]="d.page <= 1" (click)="goPage(-1)"><app-icon name="chevron-left" [size]="16" /> Précédent</button>
+        <button class="btn sm" [disabled]="d.page >= pages(d)" (click)="goPage(1)">Suivant <app-icon name="chevron-right" [size]="16" /></button>
+      </div>
+    } @else {
+      <div class="spinner"></div>
+    }
+  </div>
+</div>
+
+@if (editing() !== undefined) {
+  <div class="modal-backdrop" (click)="editing.set(undefined)">
+    <form class="modal" [formGroup]="form" (click)="$event.stopPropagation()" (ngSubmit)="save()">
+      <header>
+        <h2>{{ editing() ? "Modifier l'utilisateur" : 'Nouvel utilisateur' }}</h2>
+        <button type="button" class="icon-btn" (click)="editing.set(undefined)" aria-label="Fermer"><app-icon name="x" /></button>
+      </header>
+      <div class="modal-body">
+        @if (error()) { <div class="alert error">{{ error() }}</div> }
+        <div class="form-grid">
+          <div class="field"><label for="fn">Prénom *</label><input id="fn" class="input" formControlName="firstName" (blur)="suggestEmail()" /></div>
+          <div class="field"><label for="ln">Nom *</label><input id="ln" class="input" formControlName="lastName" (blur)="suggestEmail()" /></div>
+          <div class="field full"><label for="em">E-mail *</label><input id="em" class="input" type="email" formControlName="email" [placeholder]="'prenom.nom@' + domain" /></div>
+          <div class="field"><label for="mat">Matricule *</label><input id="mat" class="input" formControlName="matricule" placeholder="ENI-2026-0001" /></div>
+          <div class="field"><label for="role">Rôle *</label>
+            <select id="role" class="input" formControlName="role">
+              @for (r of roles; track r) { <option [value]="r">{{ roleLabels[r] }}</option> }
+            </select>
+          </div>
+          @if (form.controls.role.value === 'ETUDIANT') {
+            <div class="field"><label for="lvl">Niveau *</label>
+              <select id="lvl" class="input" formControlName="level">
+                <option [ngValue]="null">—</option>
+                @for (l of levels; track l) { <option [ngValue]="l">{{ l }}</option> }
+              </select>
+            </div>
+            <div class="field"><label for="trk">Parcours</label>
+              <select id="trk" class="input" formControlName="track">
+                <option [ngValue]="null">—</option>
+                @for (t of tracks; track t) { <option [ngValue]="t">{{ t }}</option> }
+              </select>
+            </div>
+          } @else {
+            <div class="field full"><label for="pos">Fonction</label><input id="pos" class="input" formControlName="position" placeholder="Ex. Enseignant – Réseaux" /></div>
+          }
+          <div class="field"><label for="ph">Téléphone</label><app-phone-input inputId="ph" formControlName="phone" /></div>
+          <div class="field"><label>&nbsp;</label><label class="checkbox"><input type="checkbox" formControlName="active" /> Compte actif</label></div>
+        </div>
+      </div>
+      <footer>
+        <button type="button" class="btn" (click)="editing.set(undefined)">Annuler</button>
+        <button type="submit" class="btn primary" [disabled]="saving()">{{ saving() ? 'Enregistrement…' : 'Enregistrer' }}</button>
+      </footer>
+    </form>
+  </div>
+}
+
+@if (confirming(); as c) {
+  <div class="modal-backdrop" (click)="cancelConfirm()">
+    <div class="modal confirm" role="alertdialog" aria-modal="true" aria-labelledby="cf-title" aria-describedby="cf-desc" (click)="$event.stopPropagation()">
+      <header>
+        <h2 id="cf-title">{{ c.kind === 'validate' ? 'Valider l’inscription' : 'Refuser l’inscription' }}</h2>
+        <button type="button" class="icon-btn" (click)="cancelConfirm()" aria-label="Fermer"><app-icon name="x" /></button>
+      </header>
+      <div class="modal-body">
+        <div class="who confirm-user"><app-avatar [user]="c.user" [size]="40" /><div><strong>{{ c.user | fullName }}</strong><span class="muted">{{ c.user.email }}</span></div></div>
+        <p id="cf-desc" class="confirm-text">
+          @if (c.kind === 'validate') {
+            Le compte sera <strong>activé</strong> et l’utilisateur pourra se connecter immédiatement à la plateforme.
+          } @else {
+            La demande sera <strong>refusée</strong> : le compte restera inactif et l’utilisateur ne pourra pas se connecter.
+          }
+        </p>
+      </div>
+      <footer>
+        <button type="button" class="btn" (click)="cancelConfirm()">Annuler</button>
+        <button type="button" class="btn" [class.success]="c.kind === 'validate'" [class.danger]="c.kind === 'reject'" (click)="submitConfirm()">
+          <app-icon [name]="c.kind === 'validate' ? 'check' : 'x'" [size]="16" />
+          {{ c.kind === 'validate' ? 'Valider le compte' : 'Refuser la demande' }}
+        </button>
+      </footer>
+    </div>
+  </div>
+}

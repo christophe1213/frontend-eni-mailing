@@ -1,0 +1,206 @@
+<div class="public-page">
+  @if (meta(); as m) {
+    <div class="public-card sheet">
+      <!-- ===== Formulaire ===== -->
+      <header class="head">
+        <div>
+          <span class="badge primary">{{ m.label }}</span>
+          <h1>Créer votre compte</h1>
+          <p>Renseignez vos informations telles qu’elles figurent dans votre dossier ENI.</p>
+        </div>
+        <span class="role-tile" [class]="'tone-' + m.tone"><app-icon [name]="m.icon" [size]="24" /></span>
+      </header>
+
+      @if (m.role === 'ADMIN') {
+        <div class="alert warn"><app-icon name="alert" [size]="16" /> Les comptes administrateurs sont soumis à une validation renforcée par la direction.</div>
+      }
+      @if (error()) {
+        <div class="alert error" role="alert">{{ error() }}</div>
+      }
+
+      <form [formGroup]="form" (ngSubmit)="submit()" novalidate>
+        <!-- Informations personnelles -->
+        <section>
+          <h2>Informations personnelles</h2>
+          <div class="form-grid">
+            <div class="field">
+              <label for="fn">Prénom *</label>
+              <input id="fn" class="input" formControlName="firstName" placeholder="Votre prénom" autocomplete="given-name" />
+              @if (invalid('firstName')) { <span class="error">Le prénom est obligatoire.</span> }
+            </div>
+            <div class="field">
+              <label for="ln">Nom *</label>
+              <input id="ln" class="input" formControlName="lastName" placeholder="Votre nom" autocomplete="family-name" />
+              @if (invalid('lastName')) { <span class="error">Le nom est obligatoire.</span> }
+            </div>
+            <div class="field">
+              <label for="em">Adresse e-mail *</label>
+              <input id="em" class="input" type="email" formControlName="email" [placeholder]="'prenom.nom@' + domain" autocomplete="email" />
+              @if (invalid('email')) { <span class="error">Utilisez votre adresse institutionnelle &#64;{{ domain }}.</span> }
+            </div>
+            <div class="field">
+              <label for="ph">Téléphone *</label>
+              <app-phone-input inputId="ph" formControlName="phone" />
+              @if (invalid('phone') && form.controls.phone.hasError('required')) { <span class="error">Le numéro de téléphone est obligatoire.</span> }
+            </div>
+            <div class="field full">
+              <label for="ev">E-mail de vérification personnel *</label>
+              <input id="ev" class="input" type="email" formControlName="emailVerification" placeholder="votre.adresse@gmail.com" autocomplete="off" />
+              <span class="hint">Un code de vérification y sera envoyé pour confirmer votre inscription. Il servira aussi à récupérer votre mot de passe.</span>
+              @if (invalid('emailVerification')) {
+                <span class="error">
+                  @if (form.controls.emailVerification.hasError('sameAsEmail')) { Cette adresse doit être différente de votre adresse institutionnelle. }
+                  @else if (form.controls.emailVerification.hasError('institutional')) { Utilisez une adresse personnelle (hors &#64;{{ domain }}). }
+                  @else { Saisissez une adresse e-mail valide. }
+                </span>
+              }
+            </div>
+          </div>
+        </section>
+
+        <!-- Informations spécifiques au rôle -->
+        <section>
+          <h2>{{ m.slug === 'etudiant' ? 'Informations académiques' : 'Informations professionnelles' }}</h2>
+          <div class="form-grid">
+            <div class="field">
+              <label for="mat">{{ idLabel() }} *</label>
+              <input id="mat" class="input" formControlName="matricule" [placeholder]="idPlaceholder()" />
+              @if (invalid('matricule')) { <span class="error">Cet identifiant est obligatoire.</span> }
+            </div>
+
+            @switch (m.slug) {
+              @case ('etudiant') {
+                <div class="field">
+                  <label for="yr">Année universitaire *</label>
+                  <select id="yr" class="input" formControlName="enrollmentYear">
+                    <option value="">Sélectionner…</option>
+                    @for (y of years; track y) { <option [value]="y">{{ y }}</option> }
+                  </select>
+                  @if (invalid('enrollmentYear')) { <span class="error">Champ obligatoire.</span> }
+                </div>
+                <div class="field">
+                  <label for="lvl">Niveau *</label>
+                  <select id="lvl" class="input" formControlName="level">
+                    <option value="">Sélectionner…</option>
+                    @for (l of levels; track l) { <option [value]="l">{{ l }}</option> }
+                  </select>
+                  @if (invalid('level')) { <span class="error">Champ obligatoire.</span> }
+                </div>
+                <div class="field">
+                  <label for="trk">Parcours *</label>
+                  <select id="trk" class="input" formControlName="track">
+                    <option value="">Sélectionner…</option>
+                    @for (t of tracks; track t) { <option [value]="t">{{ trackLabels[t] }}</option> }
+                  </select>
+                  @if (invalid('track')) { <span class="error">Champ obligatoire.</span> }
+                </div>
+              }
+              @case ('enseignant') {
+                <div class="field">
+                  <label for="st">Statut *</label>
+                  <select id="st" class="input" formControlName="teacherStatus">
+                    <option value="PERMANENT">Permanent</option>
+                    <option value="VACATAIRE">Vacataire</option>
+                  </select>
+                </div>
+                <div class="field">
+                  <label for="sp">Spécialité *</label>
+                  <input id="sp" class="input" formControlName="specialty" placeholder="Ex. Génie Logiciel" />
+                  @if (invalid('specialty')) { <span class="error">Champ obligatoire.</span> }
+                </div>
+                <div class="field">
+                  <label>Niveaux enseignés *</label>
+                  <div class="chips" role="group" aria-label="Niveaux enseignés">
+                    @for (l of levels; track l) {
+                      <button type="button" class="chip-toggle" [class.on]="form.controls.levelsTaught.value.includes(l)"
+                        [attr.aria-pressed]="form.controls.levelsTaught.value.includes(l)" (click)="toggleLevel(l)">{{ l }}</button>
+                    }
+                  </div>
+                  @if (invalid('levelsTaught')) { <span class="error">Sélectionnez au moins un niveau.</span> }
+                </div>
+              }
+              @default {
+                <div class="field">
+                  <label for="dep">Service *</label>
+                  <select id="dep" class="input" formControlName="department">
+                    <option value="">Sélectionner…</option>
+                    @for (d of departments; track d) { <option [value]="d">{{ d }}</option> }
+                  </select>
+                  @if (invalid('department')) { <span class="error">Champ obligatoire.</span> }
+                </div>
+                <div class="field full">
+                  <label for="pos">Fonction *</label>
+                  <input id="pos" class="input" formControlName="position" placeholder="Ex. Chef du service de scolarité" />
+                  @if (invalid('position')) { <span class="error">Champ obligatoire.</span> }
+                </div>
+              }
+            }
+          </div>
+        </section>
+
+        @if (m.role === 'ADMIN') {
+          <section>
+            <h2>Validation renforcée</h2>
+            <div class="form-grid">
+              <div class="field full">
+                <label for="jus">Motif de la demande *</label>
+                <textarea id="jus" class="input" rows="3" formControlName="justification" placeholder="Pourquoi avez-vous besoin des droits d'administration ?"></textarea>
+                @if (invalid('justification')) { <span class="error">Le motif est obligatoire.</span> }
+              </div>
+              <div class="field full">
+                <label for="spo">E-mail du responsable qui valide *</label>
+                <input id="spo" class="input" type="email" formControlName="sponsorEmail" [placeholder]="'direction@' + domain" />
+                <span class="hint">Ce responsable recevra une demande de confirmation.</span>
+                @if (invalid('sponsorEmail')) { <span class="error">Adresse e-mail obligatoire.</span> }
+              </div>
+            </div>
+          </section>
+        }
+
+        <!-- Sécurité -->
+        <section>
+          <h2>Sécurité du compte</h2>
+          <div class="form-grid">
+            <div class="field">
+              <label for="pw">Mot de passe *</label>
+              <div class="pwd">
+                <input id="pw" class="input" [type]="showPassword() ? 'text' : 'password'" formControlName="password"
+                  placeholder="12 caractères minimum" autocomplete="new-password" />
+                <button type="button" class="icon-btn" (click)="showPassword.set(!showPassword())" [attr.aria-label]="showPassword() ? 'Masquer' : 'Afficher'">
+                  <app-icon [name]="showPassword() ? 'eye-off' : 'eye'" />
+                </button>
+              </div>
+            </div>
+            <div class="field">
+              <label for="cf">Confirmer le mot de passe *</label>
+              <input id="cf" class="input" [type]="showPassword() ? 'text' : 'password'" formControlName="confirm"
+                placeholder="Saisir à nouveau" autocomplete="new-password" />
+              @if (form.controls.confirm.touched && form.controls.confirm.value !== form.controls.password.value) {
+                <span class="error">Les mots de passe ne correspondent pas.</span>
+              }
+            </div>
+          </div>
+          <p class="rules">
+            <app-icon name="lock" [size]="14" /> Au moins
+            @for (r of rules(); track r.label; let last = $last) {
+              <span [class.ok]="r.ok">{{ r.label }}</span>{{ last ? '.' : ',' }}
+            }
+          </p>
+        </section>
+
+        <label class="accept checkbox">
+          <input type="checkbox" formControlName="accept" />
+          Je certifie l’exactitude de ces informations et j’accepte la charte d’utilisation de la messagerie ENI.
+        </label>
+        @if (invalid('accept')) { <span class="error accept-err">Vous devez accepter la charte.</span> }
+
+        <footer class="actions">
+          <a class="btn lg" routerLink="/register">Retour</a>
+          <button class="btn primary lg" type="submit" [disabled]="sending()">
+            {{ sending() ? 'Envoi…' : 'Envoyer' }}
+          </button>
+        </footer>
+      </form>
+    </div>
+  }
+</div>

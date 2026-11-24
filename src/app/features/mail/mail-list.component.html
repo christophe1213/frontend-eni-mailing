@@ -1,0 +1,74 @@
+<div class="head">
+  <div>
+    <h1>{{ title() }}</h1>
+    @if (q()) { <p class="muted">Résultats pour « {{ q() }} »</p> }
+  </div>
+  <span class="muted range">{{ range() }}</span>
+</div>
+
+<div class="actions">
+  <label class="checkbox" title="Tout sélectionner">
+    <input type="checkbox" [checked]="allSelected()" (change)="toggleAll()" aria-label="Tout sélectionner" />
+  </label>
+  <button class="icon-btn" (click)="reload()" title="Actualiser" aria-label="Actualiser"><app-icon name="refresh" /></button>
+
+  @if (selected().size) {
+    <span class="sel">{{ selected().size }} sélectionné(s)</span>
+    @if (folder() === 'trash') {
+      <button class="btn sm" (click)="bulk('restore')"><app-icon name="restore" [size]="14" /> Restaurer</button>
+      <button class="btn sm danger" (click)="bulk('delete')">Supprimer définitivement</button>
+    } @else {
+      <button class="btn sm" (click)="bulk('read')">Marquer lu</button>
+      <button class="btn sm" (click)="bulk('unread')">Marquer non lu</button>
+      @if (folder() !== 'archive' && folder() !== 'drafts') {
+        <button class="btn sm" (click)="bulk('archive')"><app-icon name="archive" [size]="14" /> Archiver</button>
+      }
+      <button class="btn sm danger" (click)="bulk('trash')"><app-icon name="trash" [size]="14" /> Supprimer</button>
+    }
+  } @else if (folder() === 'inbox') {
+    <button class="btn sm" [class.on]="unreadOnly()" (click)="toggleUnread()">@if (unreadOnly()) { <app-icon name="check" [size]="14" /> }Non lus uniquement</button>
+  }
+
+  <span class="spacer"></span>
+  <button class="icon-btn" [disabled]="page() <= 1" (click)="goPage(-1)" aria-label="Page précédente"><app-icon name="chevron-left" /></button>
+  <button class="icon-btn" [disabled]="!hasNext()" (click)="goPage(1)" aria-label="Page suivante"><app-icon name="chevron-right" /></button>
+</div>
+
+@if (loading() && !data()) {
+  <div class="spinner"></div>
+} @else if (!items().length) {
+  <div class="empty">
+    <div class="empty-icon"><app-icon name="inbox" [size]="28" /></div>
+    <p>{{ emptyText() }}</p>
+  </div>
+} @else {
+  <ul class="list" [class.dim]="loading()">
+    @for (m of items(); track m.id) {
+      <li class="row" [class.unread]="!m.read" [class.checked]="selected().has(m.id)" (click)="open(m)">
+        <input type="checkbox" [checked]="selected().has(m.id)" (click)="toggle(m.id, $event)" aria-label="Sélectionner" />
+        <button class="icon-btn star" [class.active]="m.starred" (click)="star(m, $event)" [attr.aria-label]="m.starred ? 'Retirer des favoris' : 'Ajouter aux favoris'">
+          <app-icon name="star" [size]="17" [filled]="m.starred" />
+        </button>
+        <app-avatar [user]="showRecipient() ? (m.to.length ? m.to[0] : m.from) : m.from" [size]="32" />
+        <div class="who">
+          @if (showRecipient()) {
+            À : {{ m.to.length ? (m.to[0] | fullName) : '(listes)' }}{{ m.to.length > 1 ? ' +' + (m.to.length - 1) : '' }}
+          } @else {
+            {{ m.from | fullName }}
+          }
+        </div>
+        <div class="main">
+          @if (m.folder === 'drafts') { <span class="badge red">Brouillon</span> }
+          @if (m.isAnnouncement) { <span class="badge primary">Annonce</span> }
+          @if (m.priority === 'HAUTE') { <span class="badge amber">Important</span> }
+          <span class="subject">{{ m.subject || '(sans objet)' }}</span>
+          <span class="preview"> — {{ m.preview }}</span>
+        </div>
+        <div class="meta">
+          @if (m.hasAttachments) { <span title="Pièce jointe"><app-icon name="paperclip" [size]="14" /></span> }
+          <span class="date">{{ m.date | mailDate }}</span>
+        </div>
+      </li>
+    }
+  </ul>
+}

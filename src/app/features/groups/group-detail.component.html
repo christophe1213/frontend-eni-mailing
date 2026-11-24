@@ -1,0 +1,140 @@
+<div class="page">
+  <a routerLink="/groups" class="back"><app-icon name="arrow-left" [size]="14" /> Listes de diffusion</a>
+
+  @if (error() && !editing()) {
+    <div class="alert error">{{ error() }}</div>
+  }
+
+  @if (editing()) {
+    <!-- ===== Formulaire création / édition ===== -->
+    <div class="page-header">
+      <h1>{{ isNew() ? 'Nouvelle liste de diffusion' : 'Modifier la liste' }}</h1>
+    </div>
+    @if (error()) { <div class="alert error">{{ error() }}</div> }
+
+    <form class="card card-body" (ngSubmit)="save()">
+      <div class="form-grid">
+        <div class="field">
+          <label for="name">Nom *</label>
+          <input id="name" name="name" class="input" [(ngModel)]="form.name" (blur)="suggestAddress()" required placeholder="Ex. Club Robotique" />
+        </div>
+        <div class="field">
+          <label for="address">Adresse *</label>
+          <input id="address" name="address" class="input" [(ngModel)]="form.address" required [placeholder]="'club-robotique@' + domain" />
+        </div>
+        <div class="field full">
+          <label for="desc">Description</label>
+          <input id="desc" name="description" class="input" [(ngModel)]="form.description" />
+        </div>
+
+        <div class="field">
+          <label>Type</label>
+          <div class="seg">
+            <label [class.on]="form.type === 'MANUELLE'"><input type="radio" name="type" value="MANUELLE" [(ngModel)]="form.type" /> <app-icon name="group" [size]="16" /> Manuelle</label>
+            <label [class.on]="form.type === 'AUTO'" [class.disabled]="!canCreateAuto()">
+              <input type="radio" name="type" value="AUTO" [(ngModel)]="form.type" [disabled]="!canCreateAuto()" /> <app-icon name="settings" [size]="16" /> Automatique
+            </label>
+          </div>
+          <span class="hint">
+            {{ form.type === 'AUTO' ? 'Les membres sont calculés selon les critères (RG07).' : 'Vous choisissez les membres un par un.' }}
+            @if (!canCreateAuto()) { Les listes automatiques sont réservées au personnel. }
+          </span>
+        </div>
+        <div class="field">
+          <label>Accès</label>
+          <label class="checkbox"><input type="checkbox" name="open" [(ngModel)]="form.openToStudents" /> Les étudiants peuvent écrire à cette liste</label>
+        </div>
+
+        @if (form.type === 'AUTO') {
+          <div class="field">
+            <label for="crole">Rôle</label>
+            <select id="crole" name="crole" class="input" [(ngModel)]="form.criteriaRole">
+              <option [ngValue]="null">Tous</option>
+              @for (r of roles; track r) { <option [ngValue]="r">{{ roleLabels[r] }}</option> }
+            </select>
+          </div>
+          <div class="field">
+            <label for="clevel">Niveau</label>
+            <select id="clevel" name="clevel" class="input" [(ngModel)]="form.criteriaLevel">
+              <option [ngValue]="null">Tous</option>
+              @for (l of levels; track l) { <option [ngValue]="l">{{ l }}</option> }
+            </select>
+          </div>
+          <div class="field">
+            <label for="ctrack">Parcours</label>
+            <select id="ctrack" name="ctrack" class="input" [(ngModel)]="form.criteriaTrack">
+              <option [ngValue]="null">Tous</option>
+              @for (t of tracks; track t) { <option [ngValue]="t">{{ t }} – {{ trackLabels[t] }}</option> }
+            </select>
+          </div>
+        }
+      </div>
+
+      @if (form.type === 'MANUELLE') {
+        <h3 class="sec">Membres ({{ memberIds().size }})</h3>
+        <input class="input" type="search" placeholder="Filtrer les utilisateurs…" [value]="memberFilter()" (input)="memberFilter.set($any($event.target).value)" />
+        <ul class="pick">
+          @for (u of candidates(); track u.id) {
+            <li [class.on]="memberIds().has(u.id)" (click)="toggleMember(u)">
+              <input type="checkbox" [checked]="memberIds().has(u.id)" tabindex="-1" />
+              <app-avatar [user]="u" [size]="28" />
+              <span class="n">{{ u | fullName }}</span>
+              <span class="muted">{{ u.email }}</span>
+              <span class="badge">{{ u.level || (u.role | roleLabel) }}</span>
+            </li>
+          }
+        </ul>
+      }
+
+      <div class="form-actions">
+        <button type="button" class="btn" (click)="cancel()">Annuler</button>
+        <button type="submit" class="btn primary" [disabled]="saving()">{{ saving() ? 'Enregistrement…' : 'Enregistrer' }}</button>
+      </div>
+    </form>
+  } @else if (group(); as g) {
+    <!-- ===== Consultation ===== -->
+    <div class="page-header">
+      <div>
+        <h1 class="title"><app-icon [name]="g.type === 'AUTO' ? 'settings' : 'group'" [size]="22" /> {{ g.name }}</h1>
+        <p>{{ g.address }}{{ g.description ? ' — ' + g.description : '' }}</p>
+      </div>
+      <div class="hdr-actions">
+        @if (canEdit()) {
+          <button class="btn danger" (click)="remove()">Supprimer</button>
+          <button class="btn" (click)="startEdit()"><app-icon name="edit" [size]="16" /> Modifier</button>
+        }
+        <a class="btn primary" routerLink="/compose" [queryParams]="{ group: g.id }"><app-icon name="mail" [size]="16" /> Écrire à la liste</a>
+      </div>
+    </div>
+
+    <div class="summary">
+      <div class="card card-body"><span class="muted">Type</span><strong>{{ g.type === 'AUTO' ? 'Automatique' : 'Manuelle' }}</strong></div>
+      <div class="card card-body"><span class="muted">Membres</span><strong>{{ g.memberCount }}</strong></div>
+      <div class="card card-body"><span class="muted">Propriétaire</span><strong>{{ g.owner | fullName }}</strong></div>
+      <div class="card card-body"><span class="muted">{{ g.type === 'AUTO' ? 'Critères' : 'Accès étudiants' }}</span>
+        <strong>{{ g.type === 'AUTO' ? criteria(g) : (g.openToStudents ? 'Ouverte' : 'Fermée') }}</strong></div>
+    </div>
+
+    <div class="card">
+      <div class="table-wrap">
+        <table class="table">
+          <thead><tr><th>Membre</th><th>E-mail</th><th>Rôle</th><th></th></tr></thead>
+          <tbody>
+            @for (m of g.members ?? []; track m.id) {
+              <tr>
+                <td><span class="who"><app-avatar [user]="m" [size]="28" /> {{ m | fullName }}</span></td>
+                <td>{{ m.email }}</td>
+                <td><span class="badge">{{ m.role | roleLabel }}</span></td>
+                <td class="right"><a class="btn sm ghost" routerLink="/compose" [queryParams]="{ to: m.id }" aria-label="Écrire"><app-icon name="mail" [size]="16" /></a></td>
+              </tr>
+            } @empty {
+              <tr><td colspan="4" class="muted">Aucun membre.</td></tr>
+            }
+          </tbody>
+        </table>
+      </div>
+    </div>
+  } @else if (!error()) {
+    <div class="spinner"></div>
+  }
+</div>

@@ -1,0 +1,198 @@
+<div class="page">
+  <!-- ===== Indicateur d'étapes ===== -->
+  <ol class="stepper" aria-label="Étapes de la diffusion">
+    @for (s of steps; track s.n; let last = $last) {
+      <li [class.current]="step() === s.n" [class.done]="step() > s.n">
+        <button type="button" (click)="goTo(s.n)" [disabled]="step() <= s.n" [attr.aria-current]="step() === s.n ? 'step' : null">
+          <span class="dot">
+            @if (step() > s.n) { <app-icon name="check" [size]="16" [strokeWidth]="3" /> } @else { {{ s.n }} }
+          </span>
+          <span class="lbl">{{ s.label }}</span>
+        </button>
+        @if (!last) { <span class="line"></span> }
+      </li>
+    }
+  </ol>
+
+  <section class="card panel">
+    @switch (step()) {
+      @case (1) {
+        <!-- ===== Étape 1 : choisir un modèle ===== -->
+        <div class="toolbar">
+          <label class="search grow">
+            <app-icon name="search" [size]="18" />
+            <input type="search" placeholder="Rechercher un modèle…" [ngModel]="q()" (ngModelChange)="q.set($event)" />
+          </label>
+          <select class="input cat" [ngModel]="category()" (ngModelChange)="category.set($event)" aria-label="Catégorie">
+            <option value="">Toutes les catégories</option>
+            @for (c of categories(); track c) { <option [value]="c">{{ c }}</option> }
+          </select>
+          <button class="btn" type="button" (click)="edit(null)"><app-icon name="plus" [size]="16" /> Nouveau modèle</button>
+        </div>
+
+        @if (loading()) {
+          <div class="spinner"></div>
+        } @else {
+          <div class="grid">
+            @for (t of filtered(); track t.id) {
+              @let st = styleOf(t.category);
+              <article class="tpl">
+                <span class="role-tile" [class]="'tone-' + st.tone"><app-icon [name]="st.icon" [size]="22" /></span>
+                <span class="badge">{{ t.category }}</span>
+                <h3>{{ t.title }}</h3>
+                <p>Modèle institutionnel avec {{ vars(t).length || 'aucune' }} variable{{ vars(t).length > 1 ? 's' : '' }} dynamique{{ vars(t).length > 1 ? 's' : '' }} et mise en forme prédéfinie.</p>
+                <div class="act">
+                  <button class="btn ghost strong" type="button" (click)="edit(t)">Modifier</button>
+                  <button class="btn primary strong" type="button" (click)="use(t)">Utiliser</button>
+                </div>
+              </article>
+            } @empty {
+              <div class="empty full"><div class="empty-icon"><app-icon name="file-text" [size]="28" /></div><p>Aucun modèle trouvé.</p></div>
+            }
+          </div>
+        }
+      }
+
+      @case (2) {
+        <!-- ===== Étape 2 : personnaliser ===== -->
+        @let t = selected()!;
+        <div class="split">
+          <div>
+            <h2>Personnaliser « {{ t.title }} »</h2>
+            <p class="muted sub">Renseignez les variables ; l'aperçu se met à jour en direct.</p>
+
+            @if (variables().length) {
+              <div class="form-grid">
+                @for (v of variables(); track v) {
+                  <div class="field">
+                    <label [for]="'v-' + v">{{ v }}</label>
+                    <input class="input" [id]="'v-' + v" [(ngModel)]="values[v]" (ngModelChange)="touch()" [placeholder]="'Valeur de ' + v" />
+                  </div>
+                }
+              </div>
+            }
+
+            <div class="field">
+              <label for="subj">Objet</label>
+              <input id="subj" class="input" [(ngModel)]="subject" (ngModelChange)="touch()" />
+            </div>
+            <div class="field">
+              <label for="body">Message</label>
+              <textarea id="body" class="input" rows="9" [(ngModel)]="body" (ngModelChange)="touch()"></textarea>
+            </div>
+            <div class="field narrow">
+              <label for="prio">Priorité</label>
+              <select id="prio" class="input" [(ngModel)]="priority">
+                <option value="HAUTE">Haute</option>
+                <option value="NORMALE">Normale</option>
+              </select>
+            </div>
+          </div>
+
+          <aside class="preview">
+            <span class="kicker"><app-icon name="eye" [size]="14" /> Aperçu</span>
+            <div class="mailcard">
+              <div class="meta">
+                <span class="badge primary">Annonce officielle</span>
+                @if (priority === 'HAUTE') { <span class="badge amber">Important</span> }
+              </div>
+              <h3>{{ preview().subject }}</h3>
+              <div class="pbody">{{ preview().body }}</div>
+            </div>
+            @if (missing().length) {
+              <p class="warn"><app-icon name="alert" [size]="14" /> À compléter : {{ missing().join(', ') }}</p>
+            }
+          </aside>
+        </div>
+
+        <footer class="nav">
+          <button class="btn lg" type="button" (click)="step.set(1)"><app-icon name="arrow-left" [size]="16" /> Retour</button>
+          <span class="spacer"></span>
+          <button class="btn ghost" type="button" (click)="openInComposer()">Ouvrir dans l'éditeur</button>
+          <button class="btn primary lg" type="button" (click)="toRecipients()">Continuer <app-icon name="arrow-right" [size]="16" /></button>
+        </footer>
+      }
+
+      @case (3) {
+        <!-- ===== Étape 3 : destinataires ===== -->
+        <h2>Choisir les listes cibles</h2>
+        <p class="muted sub">Sélectionnez une ou plusieurs listes de diffusion.</p>
+
+        <ul class="targets">
+          @for (g of groups(); track g.id) {
+            <li>
+              <label class="target" [class.on]="targets().has(g.id)">
+                <input type="checkbox" [checked]="targets().has(g.id)" (change)="toggleTarget(g.id)" />
+                <span class="code" [class]="'tone-' + groupTone(g)">{{ groupCode(g) }}</span>
+                <span class="info">
+                  <strong>{{ g.name }}</strong>
+                  <span class="muted">{{ g.address }} · {{ g.memberCount }} membres</span>
+                </span>
+                <span class="count" [class.on]="targets().has(g.id)">{{ g.memberCount }}</span>
+              </label>
+            </li>
+          }
+        </ul>
+
+        <div class="recap" [class.empty-recap]="!chosen().length">
+          <span class="recap-ic"><app-icon name="users" [size]="24" /></span>
+          <div>
+            <span class="muted small">Récapitulatif de la diffusion</span>
+            @if (chosen().length) {
+              <strong>Envoyer à {{ recipientCount() }} destinataire{{ recipientCount() > 1 ? 's' : '' }} ?</strong>
+              <span class="muted small">
+                @for (g of chosen(); track g.id; let last = $last) { {{ g.name }}{{ last ? '' : ', ' }} }
+                · Priorité {{ priority === 'HAUTE' ? 'haute' : 'normale' }}
+              </span>
+            } @else {
+              <strong>Aucune liste sélectionnée</strong>
+            }
+          </div>
+        </div>
+
+        <footer class="nav">
+          <button class="btn lg" type="button" (click)="step.set(2)"><app-icon name="arrow-left" [size]="16" /> Retour</button>
+          <span class="spacer"></span>
+          <button class="btn primary lg" type="button" (click)="send()" [disabled]="sending() || !chosen().length">
+            <app-icon name="send" [size]="16" /> {{ sending() ? 'Envoi…' : 'Envoyer la diffusion' }}
+          </button>
+        </footer>
+      }
+    }
+  </section>
+</div>
+
+<!-- ===== Création / modification d'un modèle ===== -->
+@if (editingId() !== undefined) {
+  <div class="modal-backdrop" (click)="editingId.set(undefined)">
+    <form class="modal wide" (click)="$event.stopPropagation()" (ngSubmit)="save()">
+      <header>
+        <h2>{{ editingId() ? 'Modifier le modèle' : 'Nouveau modèle' }}</h2>
+        <button type="button" class="icon-btn" (click)="editingId.set(undefined)" aria-label="Fermer"><app-icon name="x" /></button>
+      </header>
+      <div class="modal-body">
+        @if (formError()) { <div class="alert error">{{ formError() }}</div> }
+        <div class="form-grid">
+          <div class="field"><label for="tt">Titre *</label><input id="tt" name="title" class="input" [(ngModel)]="form.title" required /></div>
+          <div class="field"><label for="tc">Catégorie *</label>
+            <input id="tc" name="category" class="input" [(ngModel)]="form.category" list="cats" required placeholder="Examens, Réunions, Administratif…" />
+            <datalist id="cats">@for (c of categories(); track c) { <option [value]="c"></option> }</datalist>
+          </div>
+          <div class="field full"><label for="ts">Objet *</label><input id="ts" name="subject" class="input" [(ngModel)]="form.subject" required /></div>
+          <div class="field full"><label for="tb">Corps *</label>
+            <textarea id="tb" name="body" class="input" rows="10" [(ngModel)]="form.body" required></textarea>
+            <span class="hint">Utilisez des variables comme <code>{{ varExample }}</code>. Détectées : {{ vars(form).join(', ') || 'aucune' }}</span>
+          </div>
+        </div>
+      </div>
+      <footer>
+        @if (editingId()) {
+          <button type="button" class="btn danger" (click)="remove()"><app-icon name="trash" [size]="16" /> Supprimer</button>
+        }
+        <span class="spacer"></span>
+        <button type="button" class="btn" (click)="editingId.set(undefined)">Annuler</button>
+        <button type="submit" class="btn primary">Enregistrer</button>
+      </footer>
+    </form>
+  </div>
+}

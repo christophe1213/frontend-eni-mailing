@@ -1,0 +1,124 @@
+<div class="actions">
+  <button class="icon-btn" (click)="back()" title="Retour" aria-label="Retour"><app-icon name="arrow-left" /></button>
+  @if (message(); as m) {
+    @if (m.folder === 'trash') {
+      <button class="btn sm" (click)="restore()"><app-icon name="restore" [size]="16" /> Restaurer</button>
+    } @else if (m.folder !== 'archive') {
+      <button class="icon-btn" (click)="archive()" title="Archiver" aria-label="Archiver"><app-icon name="archive" /></button>
+    }
+    <button class="icon-btn" (click)="remove()" [title]="m.folder === 'trash' ? 'Supprimer définitivement' : 'Supprimer'" aria-label="Supprimer"><app-icon name="trash" /></button>
+    <button class="icon-btn" (click)="markUnread()" title="Marquer comme non lu" aria-label="Marquer comme non lu"><app-icon name="mail" /></button>
+    <span class="spacer"></span>
+    <button class="icon-btn" (click)="print()" title="Imprimer" aria-label="Imprimer"><app-icon name="printer" /></button>
+  }
+</div>
+
+@if (error()) {
+  <div class="empty">
+    <div class="empty-icon"><app-icon name="alert" [size]="28" /></div>
+    <p>{{ error() }}</p>
+    <button class="btn" (click)="back()">Retour à la liste</button>
+  </div>
+} @else if (!message()) {
+  <div class="spinner"></div>
+} @else {
+  @let m = message()!;
+  <article class="mail">
+    <div class="title">
+      <h1>{{ m.subject || '(sans objet)' }}</h1>
+      @if (m.isAnnouncement) { <span class="badge primary">Annonce officielle</span> }
+      @if (m.priority === 'HAUTE') { <span class="badge amber">Important</span> }
+      <button class="icon-btn star" [class.active]="m.starred" (click)="toggleStar()" [attr.aria-label]="m.starred ? 'Retirer des favoris' : 'Ajouter aux favoris'">
+        <app-icon name="star" [size]="20" [filled]="m.starred" />
+      </button>
+    </div>
+
+    <header class="sender">
+      <app-avatar [user]="m.from" [size]="42" />
+      <div class="info">
+        <div><strong>{{ m.from | fullName }}</strong> <span class="muted">&lt;{{ m.from.email }}&gt;</span>
+          <span class="badge">{{ m.from.role | roleLabel }}</span>
+          @if (canAddContact()) {
+            @if (contactAdded()) {
+              <span class="contact-state"><app-icon name="check" [size]="14" /> Dans vos contacts</span>
+            } @else {
+              <button type="button" class="contact-btn" (click)="addContact()" [disabled]="addingContact()" [attr.aria-busy]="addingContact()">
+                @if (addingContact()) {
+                  <span class="btn-spinner"></span> Ajout…
+                } @else {
+                  <app-icon name="user-plus" [size]="14" /> Ajouter aux contacts
+                }
+              </button>
+            }
+          }
+        </div>
+        <div class="recips">
+          @if (m.groups.length) {
+            à
+            @for (g of m.groups; track g.id) {
+              <a class="badge primary" [routerLink]="['/groups', g.id]"><app-icon name="megaphone" [size]="12" /> {{ g.name }}</a>
+            }
+          } @else {
+            à
+            @for (r of to(); track r.user.id; let last = $last) {
+              {{ r.user | fullName }}{{ last ? '' : ', ' }}
+            }
+          }
+          <button class="link" (click)="showAllRecipients.set(!showAllRecipients())">
+            {{ showAllRecipients() ? 'masquer' : 'détails' }} ▾
+          </button>
+        </div>
+        @if (showAllRecipients()) {
+          <dl class="details">
+            <dt>De</dt><dd>{{ m.from | fullName }} &lt;{{ m.from.email }}&gt;</dd>
+            @if (to().length) {
+              <dt>À</dt>
+              <dd>{{ names(to()) }}</dd>
+            }
+            @if (cc().length) {
+              <dt>Cc</dt>
+              <dd>{{ names(cc()) }}</dd>
+            }
+            @if (bcc().length) {
+              <dt>Cci</dt>
+              <dd>{{ names(bcc()) }}</dd>
+            }
+            <dt>Date</dt><dd>{{ m.date | mailDate: true }}</dd>
+          </dl>
+        }
+      </div>
+      <span class="date muted">{{ m.date | mailDate: true }}</span>
+    </header>
+
+    <!-- Texte brut : interpolation Angular = contenu échappé (pas d'injection HTML) -->
+    <div class="body">{{ m.body }}</div>
+
+    @if (m.attachments.length) {
+      <section class="attachments">
+        <h3>{{ m.attachments.length }} pièce(s) jointe(s)</h3>
+        <div class="files">
+          @for (a of m.attachments; track a.id; let i = $index) {
+            <button class="file" (click)="viewerIndex.set(i)" [attr.aria-label]="'Aperçu de ' + a.fileName">
+              <span class="ext">{{ a.fileName.split('.').pop()?.toUpperCase() }}</span>
+              <span class="name">{{ a.fileName }}</span>
+              <span class="muted size">{{ a.size | fileSize }}</span>
+            </button>
+          }
+        </div>
+      </section>
+      @if (viewerIndex() !== null) {
+        <app-attachment-viewer [files]="m.attachments" [startIndex]="viewerIndex()!" (closed)="viewerIndex.set(null)" />
+      }
+    }
+
+    @if (m.folder !== 'trash') {
+      <footer class="reply">
+        <a class="btn" [routerLink]="['/compose']" [queryParams]="{ replyTo: m.id }"><app-icon name="reply" [size]="16" /> Répondre</a>
+        @if (m.recipients.length > 1 || cc().length) {
+          <a class="btn" [routerLink]="['/compose']" [queryParams]="{ replyTo: m.id, all: 1 }"><app-icon name="reply-all" [size]="16" /> Répondre à tous</a>
+        }
+        <a class="btn" [routerLink]="['/compose']" [queryParams]="{ forward: m.id }"><app-icon name="forward" [size]="16" /> Transférer</a>
+      </footer>
+    }
+  </article>
+}

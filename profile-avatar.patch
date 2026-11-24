@@ -1,0 +1,271 @@
+diff --git a/src/app/core/mock/mock-backend.interceptor.ts b/src/app/core/mock/mock-backend.interceptor.ts
+index 6f2a9f6..7d4cb76 100644
+--- a/src/app/core/mock/mock-backend.interceptor.ts
++++ b/src/app/core/mock/mock-backend.interceptor.ts
+@@ -1,5 +1,5 @@
+ import { HttpErrorResponse, HttpInterceptorFn, HttpRequest, HttpResponse } from '@angular/common/http';
+-import { Observable, of, throwError } from 'rxjs';
++import { from, Observable, of, throwError } from 'rxjs';
+ import { delay, mergeMap } from 'rxjs/operators';
+ import { environment } from '../../../environments/environment';
+ import { toE164 } from '../../shared/phone';
+@@ -52,7 +52,7 @@ function publicUser({ password, ...rest }: DbUser): User {
+ function summary(id: number): UserSummary {
+   const x = db.users.find((u) => u.id === id);
+   return x
+-    ? { id: x.id, firstName: x.firstName, lastName: x.lastName, email: x.email, role: x.role }
++    ? { id: x.id, firstName: x.firstName, lastName: x.lastName, email: x.email, role: x.role, avatarUrl: x.avatarUrl ?? null }
+     : { id, firstName: 'Utilisateur', lastName: 'supprimé', email: '', role: 'ETUDIANT' };
+ }
+ 
+@@ -440,7 +440,7 @@ function currentUser(req: HttpRequest<unknown>): DbUser {
+   return me ?? fail(401, 'Session expirée, veuillez vous reconnecter.');
+ }
+ 
+-function handle(req: HttpRequest<unknown>, path: string, params: URLSearchParams): unknown {
++function handle(req: HttpRequest<unknown>, path: string, params: URLSearchParams, avatarData?: string): unknown {
+   const { method } = req;
+   const body = req.body as any;
+   const seg = path.split('/').filter(Boolean);
+@@ -510,6 +510,16 @@ function handle(req: HttpRequest<unknown>, path: string, params: URLSearchParams
+     Object.assign(me, { phone: cleanPhone(phone), signature, notifEmail }); save();
+     return publicUser(me);
+   }
++  if (path === '/auth/me/avatar' && method === 'POST') {
++    if (!avatarData) fail(422, 'Aucune image reçue.');
++    if (!/^data:image\/(jpeg|png|webp);base64,/.test(avatarData!)) fail(422, 'Format non pris en charge (JPEG, PNG ou WebP).');
++    me.avatarUrl = avatarData; save();
++    return publicUser(me);
++  }
++  if (path === '/auth/me/avatar' && method === 'DELETE') {
++    me.avatarUrl = null; save();
++    return publicUser(me);
++  }
+   if (path === '/auth/change-password' && method === 'POST') {
+     if (body.currentPassword !== me.password) fail(422, 'Mot de passe actuel incorrect.');
+     if (!STRONG_PASSWORD.test(body.newPassword)) fail(422, PASSWORD_RULE);
+@@ -669,16 +679,30 @@ function handle(req: HttpRequest<unknown>, path: string, params: URLSearchParams
+   return fail(404, `Route simulée inconnue : ${method} ${path}`);
+ }
+ 
++function blobToDataUrl(blob: Blob): Promise<string> {
++  return new Promise((resolve, reject) => {
++    const r = new FileReader();
++    r.onload = () => resolve(String(r.result));
++    r.onerror = () => reject(r.error);
++    r.readAsDataURL(blob);
++  });
++}
++
+ export const mockBackendInterceptor: HttpInterceptorFn = (req, next) => {
+   if (!environment.useMockApi || !req.url.startsWith(environment.apiUrl)) return next(req);
+   const path = req.url.slice(environment.apiUrl.length).split('?')[0];
+   const params = new URLSearchParams(req.urlWithParams.split('?')[1] ?? '');
+ 
+-  return of(null).pipe(
++  // Envoi de photo : on lit l'image (FormData) en data URL pour la stocker dans la base simulée
++  const file = req.body instanceof FormData ? req.body.get('file') : null;
++  const avatarData$: Observable<string | undefined> =
++    path === '/auth/me/avatar' && req.method === 'POST' && file instanceof Blob ? from(blobToDataUrl(file)) : of(undefined);
++
++  return avatarData$.pipe(
+     delay(200 + Math.random() * 200), // latence réseau simulée
+-    mergeMap((): Observable<HttpResponse<unknown>> => {
++    mergeMap((avatarData): Observable<HttpResponse<unknown>> => {
+       try {
+-        const body = handle(req, path, params);
++        const body = handle(req, path, params, avatarData);
+         return of(new HttpResponse({ status: body === null ? 204 : 200, body, url: req.url }));
+       } catch (e) {
+         if (e instanceof ApiError) {
+diff --git a/src/app/core/models/index.ts b/src/app/core/models/index.ts
+index 42b2033..9267f96 100644
+--- a/src/app/core/models/index.ts
++++ b/src/app/core/models/index.ts
+@@ -20,6 +20,8 @@ export interface User {
+   phone?: string | null;
+   signature?: string | null;
+   notifEmail: boolean;
++  /** URL de la photo de profil (null/absent = initiales) */
++  avatarUrl?: string | null;
+   active: boolean;
+   /** Inscription en attente de validation par l'administration */
+   pending?: boolean;
+@@ -76,7 +78,7 @@ export interface VerifyResetOtpResponse extends OtpResponse {
+   resetToken: string;
+ }
+ 
+-export type UserSummary = Pick<User, 'id' | 'firstName' | 'lastName' | 'email' | 'role'>;
++export type UserSummary = Pick<User, 'id' | 'firstName' | 'lastName' | 'email' | 'role' | 'avatarUrl'>;
+ 
+ export interface UserPayload {
+   matricule: string;
+diff --git a/src/app/core/services/auth.service.ts b/src/app/core/services/auth.service.ts
+index c8ad1ac..102f867 100644
+--- a/src/app/core/services/auth.service.ts
++++ b/src/app/core/services/auth.service.ts
+@@ -90,6 +90,17 @@ export class AuthService {
+     return this.http.put<User>(`${this.api}/me`, data).pipe(tap((u) => this.setUser(u)));
+   }
+ 
++  /** Envoie la nouvelle photo de profil (multipart, champ « file ») */
++  uploadAvatar(file: Blob): Observable<User> {
++    const form = new FormData();
++    form.append('file', file, 'avatar.jpg');
++    return this.http.post<User>(`${this.api}/me/avatar`, form).pipe(tap((u) => this.setUser(u)));
++  }
++
++  removeAvatar(): Observable<User> {
++    return this.http.delete<User>(`${this.api}/me/avatar`).pipe(tap((u) => this.setUser(u)));
++  }
++
+   changePassword(currentPassword: string, newPassword: string): Observable<void> {
+     return this.http.post<void>(`${this.api}/change-password`, { currentPassword, newPassword });
+   }
+diff --git a/src/app/features/profile/profile.component.ts b/src/app/features/profile/profile.component.ts
+index 474dc05..2c765b6 100644
+--- a/src/app/features/profile/profile.component.ts
++++ b/src/app/features/profile/profile.component.ts
+@@ -7,10 +7,13 @@ import { resetMockDb } from '../../core/mock/mock-backend.interceptor';
+ import { AuthService } from '../../core/services/auth.service';
+ import { ToastService } from '../../core/services/toast.service';
+ import { AvatarComponent } from '../../shared/avatar.component';
++import { resizeToSquare } from '../../shared/image-resize';
+ import { PhoneInputComponent } from '../../shared/phone-input.component';
+ import { phoneIssue } from '../../shared/phone';
+ import { FullNamePipe, MailDatePipe, RoleLabelPipe } from '../../shared/pipes';
+ 
++const MAX_PHOTO = 5 * 1024 * 1024;
++
+ @Component({
+   selector: 'app-profile',
+   imports: [FormsModule, AvatarComponent, FullNamePipe, RoleLabelPipe, MailDatePipe, PhoneInputComponent],
+@@ -21,7 +24,16 @@ import { FullNamePipe, MailDatePipe, RoleLabelPipe } from '../../shared/pipes';
+       <div class="page-header"><h1>Mon profil</h1></div>
+ 
+       <section class="card card-body identity">
+-        <app-avatar [user]="u" [size]="76" />
++        <div class="avatar-box">
++          <app-avatar [user]="u" [size]="76" />
++          <div class="avatar-actions">
++            <label class="btn sm" [class.disabled]="avatarBusy()">
++              {{ avatarBusy() ? 'Envoi…' : 'Changer la photo' }}
++              <input type="file" hidden #photoInput accept="image/jpeg,image/png,image/webp" [disabled]="avatarBusy()" (change)="onPhotoSelected(photoInput)" />
++            </label>
++            @if (u.avatarUrl) { <button type="button" class="btn sm ghost" [disabled]="avatarBusy()" (click)="removePhoto()">Supprimer</button> }
++          </div>
++        </div>
+         <div>
+           <h2>{{ u | fullName }}</h2>
+           <p class="muted">{{ u.email }}</p>
+@@ -86,6 +98,9 @@ import { FullNamePipe, MailDatePipe, RoleLabelPipe } from '../../shared/pipes';
+     .identity { display: flex; gap: 20px; align-items: center; flex-wrap: wrap;
+       p { margin: 4px 0; } .tags { display: flex; flex-wrap: wrap; gap: 6px; margin: 10px 0; } }
+     .small { font-size: 12px; }
++    .avatar-box { display: flex; flex-direction: column; align-items: center; gap: 8px; }
++    .avatar-actions { display: flex; flex-direction: column; align-items: center; gap: 4px; }
++    label.btn { cursor: pointer; } label.btn.disabled { opacity: .6; pointer-events: none; }
+     h2 { margin-bottom: 14px; }
+     .actions { display: flex; justify-content: flex-end; margin-top: 14px; }
+   `,
+@@ -100,6 +115,7 @@ export class ProfileComponent {
+   signature = this.auth.user()?.signature ?? '';
+   notifEmail = this.auth.user()?.notifEmail ?? true;
+   readonly saving = signal(false);
++  readonly avatarBusy = signal(false);
+ 
+   current = '';
+   next = '';
+@@ -115,6 +131,31 @@ export class ProfileComponent {
+     });
+   }
+ 
++  async onPhotoSelected(input: HTMLInputElement): Promise<void> {
++    const file = input.files?.[0];
++    input.value = '';
++    if (!file) return;
++    if (!/^image\/(jpeg|png|webp)$/.test(file.type)) { this.toast.error('Format non pris en charge (JPEG, PNG ou WebP).'); return; }
++    if (file.size > MAX_PHOTO) { this.toast.error('Image trop volumineuse (5 Mo max).'); return; }
++    this.avatarBusy.set(true);
++    let blob: Blob;
++    try { blob = await resizeToSquare(file); }
++    catch { this.avatarBusy.set(false); this.toast.error('Impossible de lire cette image.'); return; }
++    this.auth.uploadAvatar(blob).subscribe({
++      next: () => { this.avatarBusy.set(false); this.toast.success('Photo de profil mise à jour'); },
++      error: (e) => { this.avatarBusy.set(false); this.toast.error(errorMessage(e)); },
++    });
++  }
++
++  removePhoto(): void {
++    if (!confirm('Supprimer votre photo de profil ?')) return;
++    this.avatarBusy.set(true);
++    this.auth.removeAvatar().subscribe({
++      next: () => { this.avatarBusy.set(false); this.toast.success('Photo supprimée'); },
++      error: (e) => { this.avatarBusy.set(false); this.toast.error(errorMessage(e)); },
++    });
++  }
++
+   changePassword(): void {
+     this.pwdError.set('');
+     if (!/^(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z0-9]).{12,}$/.test(this.next)) {
+diff --git a/src/app/shared/avatar.component.ts b/src/app/shared/avatar.component.ts
+index 00575df..53324f6 100644
+--- a/src/app/shared/avatar.component.ts
++++ b/src/app/shared/avatar.component.ts
+@@ -1,4 +1,4 @@
+-import { ChangeDetectionStrategy, Component, computed, input } from '@angular/core';
++import { ChangeDetectionStrategy, Component, computed, input, signal } from '@angular/core';
+ import { UserSummary } from '../core/models';
+ 
+ const COLORS = ['#15803d', '#7c3aed', '#db2777', '#ea580c', '#0d9488', '#16a34a', '#0891b2', '#9333ea'];
+@@ -7,13 +7,25 @@ const COLORS = ['#15803d', '#7c3aed', '#db2777', '#ea580c', '#0d9488', '#16a34a'
+ @Component({
+   selector: 'app-avatar',
+   changeDetection: ChangeDetectionStrategy.OnPush,
+-  template: `<span class="avatar" [style.background]="color()" [style.width.px]="size()" [style.height.px]="size()"
+-    [style.font-size.px]="size() * 0.4" [attr.aria-label]="label()">{{ initials() }}</span>`,
+-  styles: `.avatar { display: inline-grid; place-items: center; border-radius: 50%; color: #fff; font-weight: 600; flex-shrink: 0; user-select: none; }`,
++  template: `
++    @if (photo(); as src) {
++      <img class="avatar" [src]="src" [alt]="label()" [style.width.px]="size()" [style.height.px]="size()" (error)="failed.set(src)" />
++    } @else {
++      <span class="avatar" [style.background]="color()" [style.width.px]="size()" [style.height.px]="size()"
++        [style.font-size.px]="size() * 0.4" [attr.aria-label]="label()">{{ initials() }}</span>
++    }`,
++  styles: `.avatar { display: inline-grid; place-items: center; border-radius: 50%; color: #fff; font-weight: 600; flex-shrink: 0; user-select: none; }
++    img.avatar { object-fit: cover; display: inline-block; }`,
+ })
+ export class AvatarComponent {
+-  readonly user = input.required<Pick<UserSummary, 'id' | 'firstName' | 'lastName'> | null>();
++  readonly user = input.required<(Pick<UserSummary, 'id' | 'firstName' | 'lastName'> & { avatarUrl?: string | null }) | null>();
+   readonly size = input(36);
++  /** URL dont le chargement a échoué : on retombe sur les initiales */
++  readonly failed = signal<string | null>(null);
++  readonly photo = computed(() => {
++    const url = this.user()?.avatarUrl;
++    return url && url !== this.failed() ? url : null;
++  });
+ 
+   readonly initials = computed(() => {
+     const u = this.user();
+diff --git a/src/app/shared/image-resize.ts b/src/app/shared/image-resize.ts
+new file mode 100644
+index 0000000..d0ae3af
+--- /dev/null
++++ b/src/app/shared/image-resize.ts
+@@ -0,0 +1,15 @@
++/** Recadre l'image au centre en carré et la réduit (JPEG) avant l'envoi : photo légère, format homogène */
++export async function resizeToSquare(file: Blob, size = 256, quality = 0.85): Promise<Blob> {
++  const bmp = await createImageBitmap(file);
++  const side = Math.min(bmp.width, bmp.height);
++  const canvas = document.createElement('canvas');
++  canvas.width = canvas.height = size;
++  const ctx = canvas.getContext('2d');
++  if (!ctx) throw new Error('canvas indisponible');
++  ctx.fillStyle = '#fff'; // fond blanc pour les PNG/WebP transparents
++  ctx.fillRect(0, 0, size, size);
++  ctx.drawImage(bmp, (bmp.width - side) / 2, (bmp.height - side) / 2, side, side, 0, 0, size, size);
++  bmp.close();
++  return new Promise((resolve, reject) =>
++    canvas.toBlob((b) => (b ? resolve(b) : reject(new Error('conversion impossible'))), 'image/jpeg', quality));
++}

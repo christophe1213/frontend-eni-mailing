@@ -1,0 +1,70 @@
+<header class="topbar">
+  <button class="icon-btn burger" (click)="sidebarOpen.set(!sidebarOpen())" aria-label="Menu"><app-icon name="menu" [size]="20" /></button>
+  <a class="brand" routerLink="/mail/inbox">
+    <img class="logo" src="logo.png" alt="Logo ENI" /><span class="brand-name">Mail</span>
+  </a>
+
+  <form class="search" (submit)="search(q.value); $event.preventDefault()" role="search">
+    <app-icon name="search" />
+    <input #q type="search" [value]="currentQuery()" placeholder="Rechercher dans les messages…" aria-label="Rechercher" />
+  </form>
+
+  <div class="user" (click)="menuOpen.set(!menuOpen())">
+    <app-avatar [user]="auth.user()" [size]="34" />
+    <div class="who">
+      <strong>{{ auth.user()?.firstName }} {{ auth.user()?.lastName }}</strong>
+      <span>{{ auth.user()?.role | roleLabel }}</span>
+    </div>
+    @if (menuOpen()) {
+      <div class="dropdown" (click)="$event.stopPropagation()">
+        <a routerLink="/profile"><app-icon name="user" [size]="16" /> Mon profil</a>
+        <button (click)="auth.logout()"><app-icon name="logout" [size]="16" /> Se déconnecter</button>
+      </div>
+    }
+  </div>
+</header>
+
+<div class="body">
+  <aside class="sidebar" [class.open]="sidebarOpen()">
+    <a class="btn primary block compose" routerLink="/compose"><app-icon name="compose" [size]="18" /> Nouveau message</a>
+
+    <nav aria-label="Dossiers">
+      @for (f of folders; track f.folder) {
+        <a class="nav" [routerLink]="['/mail', f.folder]" routerLinkActive="active">
+          <app-icon class="ic" [name]="f.icon" />
+          <span class="txt">{{ labels[f.folder] }}</span>
+          @if (mail.counts()?.[f.folder]; as n) {
+            <span class="count" [class.strong]="f.folder === 'inbox'">{{ n }}</span>
+          }
+        </a>
+      }
+    </nav>
+
+    <div class="sep">Communauté</div>
+    <nav aria-label="Communauté">
+      <a class="nav" routerLink="/directory" routerLinkActive="active"><app-icon class="ic" name="users" /><span class="txt">Annuaire</span></a>
+      <a class="nav" routerLink="/groups" routerLinkActive="active"><app-icon class="ic" name="megaphone" /><span class="txt">Listes de diffusion</span></a>
+      @if (auth.hasRole('PERSONNEL')) {
+        <a class="nav" routerLink="/templates" routerLinkActive="active"><app-icon class="ic" name="file-text" /><span class="txt">Modèles d'annonces</span></a>
+      }
+    </nav>
+
+    @if (auth.isAdmin()) {
+      <div class="sep">Administration</div>
+      <nav aria-label="Administration">
+        <a class="nav" routerLink="/admin" routerLinkActive="active" [routerLinkActiveOptions]="{ exact: true }"><app-icon class="ic" name="dashboard" /><span class="txt">Tableau de bord</span></a>
+        <a class="nav" routerLink="/admin/users" routerLinkActive="active"><app-icon class="ic" name="user-cog" /><span class="txt">Utilisateurs</span></a>
+        <a class="nav" routerLink="/admin/logs" routerLinkActive="active"><app-icon class="ic" name="logs" /><span class="txt">Journal d'audit</span></a>
+      </nav>
+    }
+
+    <div class="foot">ENI — École Nationale d'Informatique</div>
+  </aside>
+  @if (sidebarOpen()) {
+    <div class="scrim" (click)="sidebarOpen.set(false)"></div>
+  }
+
+  <main class="content">
+    <router-outlet />
+  </main>
+</div>

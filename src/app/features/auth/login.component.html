@@ -1,0 +1,61 @@
+<div class="auth">
+  <section class="hero">
+    <img class="logo" src="logo.png" alt="Logo ENI" />
+    <h1>Messagerie interne</h1>
+    <p>Échangez avec les étudiants, enseignants et services de l'École Nationale d'Informatique, et recevez les annonces officielles au même endroit.</p>
+    <ul>
+      <li><app-icon name="megaphone" /> Listes de diffusion par niveau et parcours</li>
+      <li><app-icon name="file-text" /> Modèles d'annonces officielles</li>
+      <li><app-icon name="users" /> Annuaire de toute l'école</li>
+    </ul>
+  </section>
+
+  <section class="panel">
+    <form class="card form" [formGroup]="form" (ngSubmit)="submit()" novalidate>
+      <h2>Connexion</h2>
+      <p class="muted sub">Utilisez votre adresse institutionnelle.</p>
+
+      @if (error()) {
+        <div class="alert error" role="alert">
+          {{ error() }}
+          @if (needsVerification()) {
+            <br /><a routerLink="/verify-email" [queryParams]="{ email: form.controls.email.value }">Saisir mon code de vérification</a>
+          }
+        </div>
+      }
+
+      <div class="field">
+        <label for="email">Adresse e-mail</label>
+        <input id="email" class="input" type="email" formControlName="email" placeholder="prenom.nom@eni.mg" autocomplete="username" />
+        @if (form.controls.email.touched && form.controls.email.invalid) {
+          <span class="error">Saisissez une adresse e-mail valide.</span>
+        }
+      </div>
+
+      <div class="field">
+        <label for="password">Mot de passe</label>
+        <div class="pwd">
+          <input id="password" class="input" [type]="showPassword() ? 'text' : 'password'" formControlName="password" autocomplete="current-password" />
+          <button type="button" class="icon-btn" (click)="showPassword.set(!showPassword())" [attr.aria-label]="showPassword() ? 'Masquer' : 'Afficher'">
+            <app-icon [name]="showPassword() ? 'eye-off' : 'eye'" />
+          </button>
+        </div>
+        @if (form.controls.password.touched && form.controls.password.invalid) {
+          <span class="error">Le mot de passe est obligatoire.</span>
+        }
+      </div>
+
+      <div class="row">
+        <a routerLink="/verify-email">Vérifier mon e-mail</a>
+        <a routerLink="/forgot-password">Mot de passe oublié ?</a>
+      </div>
+
+      <button class="btn primary block lg" type="submit" [disabled]="loading()">
+        {{ loading() ? 'Connexion…' : 'Se connecter' }}
+      </button>
+
+      <p class="register">Pas encore de compte ? <a routerLink="/register">Créer un compte ENI</a></p>
+
+    </form>
+  </section>
+</div>

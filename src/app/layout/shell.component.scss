@@ -1,0 +1,66 @@
+:host { display: flex; flex-direction: column; height: 100vh; }
+
+.topbar {
+  height: var(--topbar-h); flex-shrink: 0; display: flex; align-items: center; gap: 16px;
+  padding: 0 16px; background: var(--surface); border-bottom: 1px solid var(--border); z-index: 30;
+}
+.burger { display: none; }
+.brand { display: flex; align-items: center; gap: 8px; width: calc(var(--sidebar-w) - 32px); color: var(--text); text-decoration: none !important;
+  .logo { display: block; height: 32px; width: auto; object-fit: contain; }
+  .brand-name { font-size: 18px; font-weight: 700; }
+}
+.search { flex: 1; max-width: 640px; display: flex; align-items: center; gap: 8px; height: 40px; padding: 0 14px;
+  background: var(--bg); border-radius: 10px; border: 1px solid transparent;
+  &:focus-within { background: var(--surface); border-color: var(--primary); }
+  input { flex: 1; border: 0; outline: 0; background: transparent; font: inherit; color: var(--text); }
+}
+.user { margin-left: auto; position: relative; display: flex; align-items: center; gap: 10px; cursor: pointer; padding: 4px 8px; border-radius: 10px;
+  &:hover { background: var(--surface-2); }
+  .who { display: flex; flex-direction: column; line-height: 1.2;
+    strong { font-size: 13px; } span { font-size: 12px; color: var(--text-2); } }
+}
+.dropdown { position: absolute; right: 0; top: calc(100% + 6px); min-width: 190px; background: var(--surface); border: 1px solid var(--border);
+  border-radius: 10px; box-shadow: var(--shadow); padding: 6px; display: flex; flex-direction: column;
+  a, button { display: flex; align-items: center; gap: 8px; padding: 9px 12px; border-radius: 6px; text-align: left; color: var(--text); background: none; border: 0; font: inherit; cursor: pointer; text-decoration: none; }
+  a:hover, button:hover { background: var(--surface-2); }
+}
+
+/* Espace entre la barre supérieure et le contenu (menu + page) */
+.body { flex: 1; display: flex; min-height: 0; padding-top: 14px; }
+
+.sidebar { width: var(--sidebar-w); flex-shrink: 0; padding: 16px 12px; overflow-y: auto; display: flex; flex-direction: column; background: var(--bg);
+  /* flex-shrink: 0 sinon la colonne flex écrase le bouton quand le menu est long */
+  > * { flex-shrink: 0; }
+  .compose { height: 46px; min-height: 46px; margin-bottom: 16px; gap: 8px; border-radius: 12px; font-size: 15px; font-weight: 600;
+    box-shadow: 0 2px 10px rgb(var(--primary-rgb) / 25%);
+    &:hover { box-shadow: 0 4px 14px rgb(var(--primary-rgb) / 32%); } }
+}
+.nav { display: flex; align-items: center; gap: 12px; height: 40px; flex-shrink: 0; padding: 0 12px; border-radius: 0 20px 20px 0; margin-left: -12px; padding-left: 24px;
+  color: var(--text); text-decoration: none !important;
+  &:hover { background: rgb(15 23 42 / 5%); }
+  &.active { background: var(--primary-100); color: var(--primary-600); font-weight: 600; }
+  .ic { width: 20px; color: var(--text-2); }
+  &.active .ic { color: var(--primary); }
+  .txt { flex: 1; }
+  .count { font-size: 12px; color: var(--text-2); &.strong { font-weight: 700; color: var(--primary); } }
+}
+.sep { margin: 18px 12px 6px; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); }
+.foot { margin-top: auto; padding: 16px 12px 0; font-size: 11px; color: var(--muted); }
+
+.content { flex: 1; min-width: 0; overflow-y: auto; background: var(--surface); border-top-left-radius: 16px; border: 1px solid var(--border); border-right: 0; border-bottom: 0; }
+
+.scrim { display: none; }
+
+@media (max-width: 900px) {
+  .burger { display: inline-grid; }
+  .brand { width: auto; }
+  .who { display: none !important; }
+  .sidebar { position: fixed; top: var(--topbar-h); bottom: 0; left: 0; z-index: 40; background: var(--surface); box-shadow: var(--shadow);
+    transform: translateX(-100%); transition: transform .2s; &.open { transform: none; } }
+  .scrim { display: block; position: fixed; inset: var(--topbar-h) 0 0 0; background: rgb(15 23 42 / 35%); z-index: 35; }
+  .content { border-radius: 0; border: 0; }
+}
+@media (max-width: 560px) {
+  .brand-name { display: none; }
+  .topbar { gap: 8px; }
+}

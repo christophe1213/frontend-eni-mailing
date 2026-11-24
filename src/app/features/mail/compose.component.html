@@ -1,0 +1,103 @@
+<div class="compose">
+  <header class="bar">
+    <h1>{{ title() }}</h1>
+    <span class="spacer"></span>
+    @if (templates().length) {
+      <select #tplSel class="input tpl" (change)="onTemplateSelect(tplSel)" aria-label="Utiliser un modèle">
+        <option value="">Utiliser un modèle…</option>
+        @for (t of templates(); track t.id) {
+          <option [value]="t.id">{{ t.category }} — {{ t.title }}</option>
+        }
+      </select>
+    }
+  </header>
+
+  @if (error()) {
+    <div class="alert error" role="alert">{{ error() }}</div>
+  }
+
+  <div class="card sheet">
+    <div class="recipients">
+      <app-recipient-input label="À" [users]="allUsers()" [groups]="writableGroups()" [contacts]="contactChips()" [(value)]="to" />
+      @if (!showCc()) {
+        <button class="link cc-toggle" type="button" (click)="showCc.set(true)">Cc / Cci</button>
+      }
+    </div>
+    @if (showCc()) {
+      <app-recipient-input label="Cc" [users]="allUsers()" [groups]="writableGroups()" [contacts]="contactChips()" [(value)]="cc" />
+      <app-recipient-input label="Cci" [users]="allUsers()" [groups]="writableGroups()" [contacts]="contactChips()" [(value)]="bcc" />
+    }
+
+    <input class="subject" [(ngModel)]="subject" placeholder="Objet" aria-label="Objet" maxlength="255" />
+
+    @if (quoted()) {
+      <div class="quote" aria-label="Message d'origine (lecture seule)">
+        <span class="quote-label"><app-icon name="lock" [size]="12" /> Message d'origine · lecture seule</span>
+        <div class="quote-text">{{ quoted() }}</div>
+      </div>
+    }
+
+    <textarea class="body" [class.with-quote]="quoted()" [(ngModel)]="body" placeholder="Rédigez votre message…" aria-label="Message"></textarea>
+
+    @if (attachments().length || uploading()) {
+      <div class="files">
+        @for (a of attachments(); track a.id) {
+          <span class="file"><app-icon name="paperclip" [size]="14" /> {{ a.fileName }} <span class="muted">({{ a.size | fileSize }})</span>
+            <button type="button" (click)="removeAttachment(a)" aria-label="Retirer la pièce jointe"><app-icon name="x" [size]="14" /></button>
+          </span>
+        }
+        @if (uploading()) { <span class="file muted">Envoi de {{ uploading() }} fichier(s)…</span> }
+      </div>
+    }
+
+    <footer class="foot">
+      <button class="btn primary send" (click)="send()" [disabled]="sending() || uploading() > 0">
+        <app-icon name="send" [size]="16" /> {{ sending() ? 'Envoi…' : 'Envoyer' }}
+      </button>
+      <button class="btn" (click)="saveDraft()" [disabled]="sending()">Enregistrer le brouillon</button>
+
+      <label class="icon-btn" title="Joindre des fichiers (10 Mo max)" aria-label="Joindre des fichiers">
+        <app-icon name="paperclip" /><input type="file" multiple hidden #fileInput (change)="addFiles(fileInput)" />
+      </label>
+
+      <select class="input prio" [(ngModel)]="priority" aria-label="Priorité">
+        <option value="NORMALE">Priorité normale</option>
+        <option value="HAUTE">Priorité haute</option>
+      </select>
+
+      @if (canAnnounce()) {
+        <label class="checkbox"><input type="checkbox" [(ngModel)]="isAnnouncement" /> Annonce officielle</label>
+      }
+
+      <span class="spacer"></span>
+      @if (recipientCount() > 0) {
+        <span class="muted count">≈ {{ recipientCount() }} destinataire(s)</span>
+      }
+      <button class="icon-btn" (click)="discard()" [title]="draftId() ? 'Supprimer le brouillon' : 'Abandonner'" aria-label="Abandonner"><app-icon name="trash" /></button>
+    </footer>
+  </div>
+</div>
+
+@if (pendingTemplate(); as t) {
+  <div class="modal-backdrop" (click)="pendingTemplate.set(null)">
+    <form class="modal" (click)="$event.stopPropagation()" (ngSubmit)="applyTemplate()">
+      <header>
+        <h2>Modèle : {{ t.title }}</h2>
+        <button type="button" class="icon-btn" (click)="pendingTemplate.set(null)" aria-label="Fermer"><app-icon name="x" /></button>
+      </header>
+      <div class="modal-body">
+        <p class="muted">Renseignez les variables du modèle. Les champs laissés vides resteront sous la forme <code>{{ varExample }}</code>.</p>
+        @for (v of templateVars(); track v) {
+          <div class="field">
+            <label [for]="'v-' + v">{{ v }}</label>
+            <input class="input" [id]="'v-' + v" [name]="v" [(ngModel)]="templateValues[v]" />
+          </div>
+        }
+      </div>
+      <footer>
+        <button type="button" class="btn" (click)="pendingTemplate.set(null)">Annuler</button>
+        <button type="submit" class="btn primary">Appliquer le modèle</button>
+      </footer>
+    </form>
+  </div>
+}

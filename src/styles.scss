@@ -1,0 +1,177 @@
+/* ===== ENI Mail — styles globaux ===== */
+:root {
+  --primary: #15803d;
+  --primary-600: #166534;
+  --primary-50: #f0fdf4;
+  --primary-100: #dcfce7;
+  --primary-200: #bbf7d0;
+  --primary-rgb: 21 128 61;
+  --accent: #f59e0b;
+  --danger: #dc2626;
+  --danger-50: #fef2f2;
+  --success: #16a34a;
+  --success-50: #f0fdf4;
+  --warning-50: #fffbeb;
+
+  --bg: #f4f6fb;
+  --surface: #ffffff;
+  --surface-2: #f8fafc;
+  --border: #e2e8f0;
+  --text: #0f172a;
+  --text-2: #475569;
+  --muted: #94a3b8;
+
+  --radius: 10px;
+  --shadow: 0 1px 2px rgb(15 23 42 / 6%), 0 4px 16px rgb(15 23 42 / 6%);
+  --sidebar-w: 248px;
+  --topbar-h: 60px;
+  color-scheme: light;
+}
+
+* { box-sizing: border-box; }
+
+html, body { height: 100%; margin: 0; }
+
+body {
+  font-family: 'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  font-size: 14px;
+  color: var(--text);
+  background: var(--bg);
+  -webkit-font-smoothing: antialiased;
+}
+
+a { color: var(--primary); text-decoration: none; }
+a:hover { text-decoration: underline; }
+h1, h2, h3 { margin: 0; line-height: 1.25; }
+h1 { font-size: 22px; font-weight: 700; }
+h2 { font-size: 17px; font-weight: 600; }
+h3 { font-size: 15px; font-weight: 600; }
+
+/* ----- Boutons ----- */
+.btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+  height: 36px; padding: 0 14px; border-radius: 8px; border: 1px solid var(--border);
+  background: var(--surface); color: var(--text); font: inherit; font-weight: 500;
+  cursor: pointer; white-space: nowrap; transition: background .15s, border-color .15s;
+  &:hover:not(:disabled) { background: var(--surface-2); text-decoration: none; }
+  &:disabled { opacity: .55; cursor: not-allowed; }
+  &.primary { background: var(--primary); border-color: var(--primary); color: #fff;
+    &:hover:not(:disabled) { background: var(--primary-600); } }
+  &.danger { color: var(--danger); border-color: #fecaca;
+    &:hover:not(:disabled) { background: var(--danger-50); } }
+  &.ghost { border-color: transparent; background: transparent;
+    &:hover:not(:disabled) { background: var(--surface-2); } }
+  &.sm { height: 30px; padding: 0 10px; font-size: 13px; }
+  &.block { width: 100%; }
+  &:focus-visible { outline: 2px solid rgb(var(--primary-rgb) / 55%); outline-offset: 2px; }
+  &.success { background: #15803d; border-color: #15803d; color: #fff;
+    &:hover:not(:disabled) { background: #166534; border-color: #166534; } }
+  &.danger:focus-visible { outline-color: rgb(220 38 38 / 55%); }
+  /* Chargement : le bouton reste lisible mais n'est plus cliquable */
+  &.loading:disabled { opacity: 1; cursor: progress; }
+}
+
+.btn-spinner { width: 14px; height: 14px; border: 2px solid currentColor; border-right-color: transparent;
+  border-radius: 50%; animation: spin .7s linear infinite; flex-shrink: 0; }
+
+.icon-btn {
+  display: inline-grid; place-items: center; width: 34px; height: 34px; border-radius: 8px;
+  border: 0; background: transparent; color: var(--text-2); cursor: pointer; font-size: 17px;
+  &:hover { background: var(--surface-2); color: var(--text); }
+  &.active { color: var(--accent); }
+}
+
+/* ----- Formulaires ----- */
+.field { display: flex; flex-direction: column; gap: 6px; margin-bottom: 14px;
+  label { font-weight: 500; color: var(--text-2); font-size: 13px; }
+  .hint { font-size: 12px; color: var(--muted); }
+  .error { font-size: 12px; color: var(--danger); }
+}
+.input, select.input, textarea.input {
+  width: 100%; height: 38px; padding: 0 12px; border: 1px solid var(--border); border-radius: 8px;
+  background: var(--surface); color: var(--text); font: inherit; outline: none;
+  &:focus { border-color: var(--primary); box-shadow: 0 0 0 3px rgb(var(--primary-rgb) / 12%); }
+  &.ng-invalid.ng-touched { border-color: var(--danger); }
+}
+textarea.input { height: auto; min-height: 120px; padding: 10px 12px; resize: vertical; line-height: 1.55; }
+.checkbox { display: inline-flex; align-items: center; gap: 8px; cursor: pointer; }
+.form-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0 16px;
+  .full { grid-column: 1 / -1; }
+  @media (max-width: 640px) { grid-template-columns: 1fr; }
+}
+
+/* ----- Cartes, pages ----- */
+.page { padding: 24px; max-width: 1200px; margin: 0 auto;
+  @media (max-width: 640px) { padding: 16px; }
+}
+.page-header { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin-bottom: 20px;
+  p { margin: 4px 0 0; color: var(--text-2); }
+}
+.card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); box-shadow: var(--shadow); }
+.card-body { padding: 20px; }
+.toolbar { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; margin-bottom: 16px;
+  .input { width: auto; min-width: 160px; }
+  .grow { flex: 1; min-width: 200px; }
+}
+
+/* ----- Tableaux ----- */
+.table-wrap { overflow-x: auto; }
+table.table { width: 100%; border-collapse: collapse;
+  th, td { padding: 12px 14px; text-align: left; border-bottom: 1px solid var(--border); vertical-align: middle; }
+  th { font-size: 12px; font-weight: 600; color: var(--text-2); text-transform: uppercase; letter-spacing: .03em; background: var(--surface-2); }
+  tbody tr:hover { background: var(--surface-2); }
+  tbody tr:last-child td { border-bottom: 0; }
+}
+
+/* ----- Badges ----- */
+.badge { display: inline-flex; align-items: center; gap: 4px; padding: 2px 8px; border-radius: 999px;
+  font-size: 12px; font-weight: 500; background: var(--surface-2); color: var(--text-2); border: 1px solid var(--border);
+  &.primary { background: var(--primary-50); color: var(--primary); border-color: var(--primary-200); }
+  &.red { background: var(--danger-50); color: var(--danger); border-color: #fecaca; }
+  &.green { background: var(--success-50); color: var(--success); border-color: #bbf7d0; }
+  &.amber { background: var(--warning-50); color: #b45309; border-color: #fde68a; }
+}
+
+/* ----- États ----- */
+.empty { padding: 56px 20px; text-align: center; color: var(--text-2); }
+.empty-icon { width: 60px; height: 60px; margin: 0 auto 12px; display: grid; place-items: center; border-radius: 16px;
+  background: var(--primary-50); color: var(--primary); }
+/* Icône + texte alignés dans les liens / titres */
+.back, h1.title, .badge, .chip { display: inline-flex; align-items: center; gap: 6px; }
+h1.title { display: flex; gap: 10px; color: var(--text); app-icon { color: var(--primary); } }.alert { padding: 10px 14px; border-radius: 8px; margin-bottom: 14px; font-size: 13px;
+  &.error { background: var(--danger-50); color: var(--danger); border: 1px solid #fecaca; }
+  &.success { background: var(--success-50); color: var(--success); border: 1px solid #bbf7d0; }
+  &.info { background: var(--primary-50); color: var(--primary); border: 1px solid var(--primary-200); }
+}
+.muted { color: var(--muted); }
+.spinner { width: 22px; height: 22px; border: 3px solid var(--border); border-top-color: var(--primary);
+  border-radius: 50%; animation: spin .8s linear infinite; margin: 40px auto; }
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* ----- Fenêtre modale ----- */
+.modal-backdrop { position: fixed; inset: 0; background: rgb(15 23 42 / 45%); display: grid; place-items: center; z-index: 100; padding: 16px; }
+.modal { width: 100%; max-width: 560px; max-height: calc(100vh - 32px); overflow: auto;
+  background: var(--surface); border-radius: 14px; box-shadow: 0 20px 50px rgb(0 0 0 / 25%);
+  header { display: flex; align-items: center; justify-content: space-between; padding: 16px 20px; border-bottom: 1px solid var(--border); }
+  .modal-body { padding: 20px; }
+  footer { display: flex; justify-content: flex-end; gap: 8px; padding: 14px 20px; border-top: 1px solid var(--border); }
+}
+
+/* ----- Pastilles d'icône par rôle (accueil, inscription) ----- */
+.role-tile { width: 48px; height: 48px; flex-shrink: 0; display: grid; place-items: center; border-radius: 12px; }
+.tone-sky { background: #e0f2fe; color: #0369a1; }
+.tone-teal { background: #ccfbf1; color: #0f766e; }
+.tone-amber { background: #fef3c7; color: #b45309; }
+.tone-violet { background: #f3e8ff; color: #7e22ce; }
+
+/* ----- Pages d'accueil publiques (choix du rôle, inscription) ----- */
+.public-page { min-height: 100vh; display: flex; justify-content: center; align-items: flex-start; padding: 40px 16px;
+  background: radial-gradient(circle at 50% 0, var(--primary-50), var(--bg) 60%); }
+.public-card { width: 100%; background: var(--surface); border: 1px solid var(--border); border-radius: 18px; box-shadow: var(--shadow); padding: 36px 32px;
+  @media (max-width: 640px) { padding: 24px 16px; } }
+.pill { display: inline-block; padding: 4px 10px; border-radius: 6px; background: var(--primary-100); color: var(--primary-600);
+  font-size: 11px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; }
+.public-head { text-align: center; margin-bottom: 28px;
+  h1 { font-size: 30px; font-weight: 500; margin: 14px 0 10px; }
+  p { margin: 0; color: var(--text-2); font-size: 16px; } }
+.secure-note { display: flex; align-items: center; justify-content: center; gap: 8px; color: var(--text-2); font-size: 12px; margin-top: 24px; }
